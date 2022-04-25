@@ -24,14 +24,17 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 
+'''
 if torch.cuda.is_available():
     dev = torch.device("cuda:0")
 else:
     dev = torch.device("cpu")
-    
+'''
+# dev = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+
 from dataloader import Dataloader
 from utils import Processing, EvalMetrics, EarlyStopping
-from models import MultiTask
+from models import MultiTask, BaselineCnn, Vggish, ResNet
 from train import train
 from train import validation
 from matplotlib import pyplot as plt
@@ -82,11 +85,14 @@ def baseline(
     es_delta = 0.1
     val_result, loss_res, val_loss_res = [], [], []
 
-    model = MultiTask(feat_dimensions).to(dev)
+    # model = MultiTask(feat_dimensions).to(dev)
+    model = BaselineCnn(feat_dimensions)
+    # model = nn.DataParallel(model)
+    model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
 
-    inputs = torch.from_numpy(X[0].astype(np.float32)).to(dev)
-    val_inputs = torch.from_numpy(X[1].astype(np.float32)).to(dev)
+    inputs = torch.from_numpy(X[0].astype(np.float32)).cuda()
+    val_inputs = torch.from_numpy(X[1].astype(np.float32)).cuda()
 
     torch.manual_seed(seed)
 
@@ -135,7 +141,7 @@ def baseline(
             print(f"Early stopping {epoch}")
             break
 
-    val_pred, logsigma = model(torch.from_numpy(X[1].astype(np.float32)).to(dev))
+    val_pred, logsigma = model(torch.from_numpy(X[1].astype(np.float32)).cuda())
 
     for index, i in enumerate(val_pred):
         val_pred[index] = val_pred[index].cpu()
@@ -200,11 +206,15 @@ def store_predictions(
     print(f"Predicting on the test set...")
     submission_no = 1  # change manually
 
-    model = MultiTask(feat_dimensions).to(dev)
+    # model = MultiTask(feat_dimensions).to(dev)
+    # model = BaselineCnn(feat_dimensions).to(dev)
+    model = BaselineCnn(feat_dimensions)
+    # model = nn.DataParallel(model)
+    model.cuda()
     model.load_state_dict(torch.load(f"tmp/{timestamp}_{store_name}_model_{seed}.pth"))
 
     file_ids = test_filename_group
-    test_pred, logsigma = model(torch.from_numpy(X[2].astype(np.float32)).to(dev))
+    test_pred, logsigma = model(torch.from_numpy(X[2].astype(np.float32)).cuda())
 
     for index, i in enumerate(test_pred):
         test_pred[index] = test_pred[index].cpu()
@@ -295,8 +305,11 @@ def main():
 
     # Scale Data
     scaler = StandardScaler()
-
-    X, emo_y, age_y, country_y = Processing.normalise(scaler, X, high, age, country)
+    
+    if feature_type != 'LogMelSpec':
+        X, emo_y, age_y, country_y = Processing.normalise(scaler, X, high, age, country)
+    else:
+        X, emo_y, age_y, country_y = Processing.normalise2(scaler, X, high, age, country)
 
     hmean_list, ccc_list, uar_list, mae_list = [], [], [], []
 

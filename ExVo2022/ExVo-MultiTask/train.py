@@ -11,7 +11,7 @@ from utils import EarlyStopping, EvalMetrics
 from sklearn.metrics import recall_score, mean_squared_error, mean_absolute_error
 
 if torch.cuda.is_available():
-    dev = torch.device("cuda:0")
+    dev = torch.device("cuda")
 else:
     dev = torch.device("cpu")
 
@@ -48,7 +48,7 @@ def train(
 
     for i in range(0, inputs.size()[0], bs):
         indices = permutation[i : i + bs]
-        inputs_X = inputs[indices].to(dev)
+        inputs_X = inputs[indices].cuda()
         y_pred = model(inputs_X)
 
         train_pred, logsigma = model(inputs_X)
@@ -58,8 +58,8 @@ def train(
             targets = torch.from_numpy(
                 np.array(train_y.iloc[:, identifier].astype(np.float32))
             )
-            targets_y = targets[indices].to(dev)
-            loss1 = lmse(train_pred[0][:, identifier].to(dev), targets_y)
+            targets_y = targets[indices].cuda()
+            loss1 = lmse(train_pred[0][:, identifier].cuda(), targets_y)
 
             lemotion += loss1
 
@@ -68,9 +68,9 @@ def train(
         train_country = torch.from_numpy(np.array(train_country))
         train_age = torch.from_numpy(np.array(train_age))
 
-        lcountry = lclass(train_pred[1].to(dev), train_country[indices].to(dev))
+        lcountry = lclass(train_pred[1].cuda(), train_country[indices].cuda())
         lage = lmse(
-            train_pred[2].type(torch.DoubleTensor).to(dev), train_age[indices].to(dev)
+            train_pred[2].type(torch.DoubleTensor).cuda(), train_age[indices].cuda()
         )
 
         train_loss = [lemotion, lcountry, lage]
@@ -83,7 +83,7 @@ def train(
         optimizer.zero_grad()
 
     train_val = []
-    train_pred, logsigma = model(torch.from_numpy(train_X.astype(np.float32)).to(dev))
+    train_pred, logsigma = model(torch.from_numpy(train_X.astype(np.float32)).cuda())
     for index, i in enumerate(train_pred):
         train_pred[index] = train_pred[index].cpu()
     for j in classes:
@@ -137,8 +137,8 @@ def validation(
         targets = torch.from_numpy(
             np.array(val_y.iloc[:, identifier].astype(np.float32))
         )
-        targets_y = targets.to(dev)
-        loss1 = lmse(val_pred[0][:, identifier].to(dev), targets_y)
+        targets_y = targets.cuda()
+        loss1 = lmse(val_pred[0][:, identifier].cuda(), targets_y)
 
         lemotion += loss1
 
@@ -147,8 +147,8 @@ def validation(
     val_country = torch.from_numpy(np.array(val_country))
     val_age = torch.from_numpy(np.array(val_age))
 
-    lcountry = lclass(val_pred[1].to(dev), val_country.to(dev))
-    lage = lmse(val_pred[2].type(torch.DoubleTensor).to(dev), val_age.to(dev))
+    lcountry = lclass(val_pred[1].cuda(), val_country.cuda())
+    lage = lmse(val_pred[2].type(torch.DoubleTensor).cuda(), val_age.cuda())
 
     val_loss = [lemotion, lcountry, lage]
     val_loss = sum(

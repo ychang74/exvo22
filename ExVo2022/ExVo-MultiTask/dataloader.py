@@ -38,6 +38,7 @@ class Dataloader:
 
         feat_dict = {
             "ComParE": [",", "infer", 1, 6373],
+            "LogMelSpec": [",", None, 0, [621, 64]],
             "eGeMAPS": [",", "infer", 1, 88],
             "DeepSpectrum": [",", "infer", 1, 4095],
             "openXBOW/125": [",", None, 1, 125],
@@ -51,25 +52,40 @@ class Dataloader:
         header_type = feat_dict[feature_type][1]
         columns_rm = feat_dict[feature_type][2]
         feat_dimensions = feat_dict[feature_type][3]
-
+        
+        count = 0
         for filename in tqdm(glob(f"{data_dir}/feats/{feature_type}/*.csv")):
+            count += 1
+            if count == 501:
+                break
             file_id = filename.split("/")[-1][:-4]
             partition = labels["Split"][labels["File_ID"].str.contains(file_id)]
             lab_index = partition.index.values[0]
             partition = partition.values[0]
             with open(filename, "r") as csvfile:
-                reader = csv.reader(csvfile)
-                for index, row in enumerate(reader):
-                    if sep_type != ",":
-                        row = row[0].replace(sep_type, ",")
-                    if index != 0:
-                        if partition == "Train":
-                            train_X.append(row[columns_rm:])
-                        elif partition == "Val":
-                            val_X.append(row[columns_rm:])
-                        elif partition == "Test":
-                            test_X.append(row[columns_rm:])
-                    last_count = index
+                if feature_type != 'LogMelSpec':
+                    reader = csv.reader(csvfile)
+                    for index, row in enumerate(reader):
+                        if sep_type != ",":
+                            row = row[0].replace(sep_type, ",")
+                        if index != 0:
+                            if partition == "Train":
+                                train_X.append(row[columns_rm:])
+                            elif partition == "Val":
+                                val_X.append(row[columns_rm:])
+                            elif partition == "Test":
+                                test_X.append(row[columns_rm:])
+                        last_count = index
+                else:
+                    data_i = pd.read_csv(csvfile, header=None)
+                    data_i = np.resize(data_i, (621*64, ))
+                    if partition == "Train":
+                        train_X.append(data_i)
+                    elif partition == "Val":
+                        val_X.append(data_i)
+                    elif partition == "Test":
+                        test_X.append(data_i)
+                    last_count = 1
                 df_shape = last_count
                 label_id_high = [
                     labels.loc[lab_index:lab_index, classes].values[0]
@@ -139,6 +155,11 @@ class Dataloader:
             test_filename_group.to_csv(
                 f"tmp/{store_name}_test_filename.csv", index=False
             )
+        
+        # Resize the log Mel spectrogram
+        train_X_group = np.resize(train_X_group, (np.shape(train_X_group)[0], 621, 64))
+        val_X_group = np.resize(val_X_group, (np.shape(val_X_group)[0], 621, 64))
+        test_X_group = np.resize(test_X_group, (np.shape(test_X_group)[0], 621, 64))
 
         comb = [train_X_group, val_X_group, test_X_group]
         high = [train_y_group, val_y_group, test_y_group]
@@ -149,6 +170,7 @@ class Dataloader:
     def load(feature_type, store_name):
         feat_dict = {
             "ComParE": [";", "infer", 2, 6373],
+            "LogMelSpec": [",", None, 0, [621, 64]],
             "eGeMAPS": [";", "infer", 2, 88],
             "DeepSpectrum": [",", "infer", 2, 4095],
             "openXBOW/125": [",", None, 1, 125],
@@ -169,6 +191,11 @@ class Dataloader:
             pd.read_csv(f"tmp/{store_name}_val_X.csv"),
             pd.read_csv(f"tmp/{store_name}_test_X.csv"),
         )
+        # Resize the log Mel spectrogram
+        train_X_group = np.resize(train_X_group, (np.shape(train_X_group)[0], 621, 64))
+        val_X_group = np.resize(val_X_group, (np.shape(val_X_group)[0], 621, 64))
+        test_X_group = np.resize(test_X_group, (np.shape(test_X_group)[0], 621, 64))
+        
         train_y_group, val_y_group, test_y_group = (
             pd.read_csv(f"tmp/{store_name}_train_y_high.csv"),
             pd.read_csv(f"tmp/{store_name}_val_y_high.csv"),
@@ -190,4 +217,5 @@ class Dataloader:
         high = [train_y_group, val_y_group, test_y_group]
         age = [train_age_group, val_age_group, test_age_group]
         country = [train_country_group, val_country_group, test_country_group]
+
         return comb, high, age, country, feat_dimensions, test_filename_group

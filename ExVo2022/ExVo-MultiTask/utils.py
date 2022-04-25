@@ -33,7 +33,36 @@ class Processing:
             [train_age, val_age, test_age],
             [train_country, val_country, test_country],
         )
-
+    
+    def normalise2(scaler, X, high, age, country):
+        # train_X = scaler.fit_transform(X[0])
+        # train_X = pd.DataFrame(train_X).values
+        train_X = X[0]
+        # train_X = pd.DataFrame(train_X).values
+        train_y, val_y, test_y = (
+            high[0].astype(float),
+            high[1].astype(float),
+            high[2].astype(float),
+        )
+        train_country, val_country, test_country = country[0], country[1], country[2]
+        train_age, val_age, test_age = (
+            age[0].astype(float),
+            age[1].astype(float),
+            age[2].astype(float),
+        )
+        # val_X = scaler.transform(X[1])
+        # test_X = scaler.transform(X[2])
+        # test_X = pd.DataFrame(test_X).values
+        val_X = X[1]
+        # val_X = pd.DataFrame(val_X).values
+        test_X = X[2]
+        # test_X = pd.DataFrame(test_X).values
+        return (
+            [train_X, val_X, test_X],
+            [train_y, val_y, test_y],
+            [train_age, val_age, test_age],
+            [train_country, val_country, test_country],
+        )
 
 class EvalMetrics:
     def CCC(y_true, y_pred):
